@@ -162,28 +162,34 @@ func GetUsers() gin.HandlerFunc {
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
 
 		recordPerPage, err := strconv.Atoi(c.Query("recordPerPage"))
-
 		if err != nil || recordPerPage < 1 {
 			recordPerPage = 10
 		}
 
-		page, err1 := strconv.Atoi(c.Query("page"))
-		if err1 != nil || page < 1 {
+		page, err := strconv.Atoi(c.Query("page"))
+		if err != nil || page < 1 {
 			page = 1
 		}
 
 		startIndex := (page - 1) * recordPerPage
-		startIndex, err = strconv.Atoi(c.Query("startIndex"))
+		if startIndexQuery := c.Query("startIndex"); startIndexQuery != "" {
+			startIndex, err = strconv.Atoi(startIndexQuery)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid startIndex"})
+				return
+			}
+		}
 
 		matchStage := bson.D{{Key: "$match", Value: bson.D{{}}}}
 		groupStage := bson.D{
 			{Key: "$group", Value: bson.D{
 				{Key: "_id", Value: "null"},
 				{Key: "total_count", Value: bson.D{{Key: "$sum", Value: 1}}},
+				{Key: "data", Value: bson.D{{Key: "$push", Value: "$$ROOT"}}},
 			}},
-			{Key: "data", Value: bson.D{{Key: "$push", Value: "$$Root"}}},
 		}
 		projectStage := bson.D{
 			{Key: "$project", Value: bson.D{
@@ -198,16 +204,21 @@ func GetUsers() gin.HandlerFunc {
 		result, err := userCollection.Aggregate(ctx, mongo.Pipeline{
 			matchStage, groupStage, projectStage,
 		})
-		defer cancel()
-
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while listing user items"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occurred while listing user items"})
+			return
 		}
+		defer result.Close(ctx)
 
 		var allUsers []bson.M
-
 		if err = result.All(ctx, &allUsers); err != nil {
-			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occurred while decoding user items"})
+			return
+		}
+
+		if len(allUsers) == 0 {
+			c.JSON(http.StatusOK, gin.H{"message": "No users found"})
+			return
 		}
 
 		c.JSON(http.StatusOK, allUsers[0])

@@ -1,7 +1,10 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
+
+	"os"
 
 	helper "github.com/Johna210/go-jwt-project/helpers"
 	"github.com/gin-gonic/gin"
@@ -16,6 +19,7 @@ func Authenticate() gin.HandlerFunc {
 			return
 		}
 
+		fmt.Fprintln(os.Stdout, []any{"Here................"}...)
 		claims, err := helper.ValidateToken(clientToken)
 
 		if err != "" {

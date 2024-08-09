@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -48,13 +49,13 @@ func GenerateAllTokens(email string, firstName string,
 		},
 	}
 
-	token, err := jwt.NewWithClaims(jwt.SigningMethodPS256, claims).SignedString([]byte(SECRET_KEY))
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(SECRET_KEY))
 	if err != nil {
 		log.Panic(err)
 		return
 	}
 
-	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodES256, refreshClaims).SignedString([]byte(SECRET_KEY))
+	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString([]byte(SECRET_KEY))
 
 	if err != nil {
 		log.Panic(err)
@@ -86,6 +87,7 @@ func ValidateToken(signedToken string) (claims *SignedDetails, msg string) {
 
 	if claims.ExpiresAt < time.Now().Local().Unix() {
 		msg = "token is expired"
+		fmt.Println("Token is expired")
 		return
 	}
 
